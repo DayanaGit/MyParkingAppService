@@ -13,6 +13,8 @@ using Swashbuckle.AspNetCore.Annotations;
 namespace MyParkingApp.Controllers
 {
     [Route("api/[controller]")]
+    [ApiController]
+    [SwaggerTag("Services from create parking clients")]
     public class ClientController : ControllerBase
     {
         private readonly IClient _client;
@@ -24,13 +26,12 @@ namespace MyParkingApp.Controllers
             _response = new ResponseDto();
         }
 
-        // GET: api/Clients
-        /// <summary>
-        /// This method gets the list of customers
-        /// </summary>
-        /// <returns>Clients</returns>
-        /// <response code="200">Ok</response>
+        
         [HttpGet("GetClients")]
+        [SwaggerOperation(Summary = "Method that returns the list of customers.")]
+        [SwaggerResponse(200, "Get the list of customers", typeof(List<ClientDto>))]
+        [SwaggerResponse(404, "No customers found")]
+        [SwaggerResponse(500, "Internal api error")]
         public async Task <ActionResult<IEnumerable<Client>>> GetClients()
         {
             try
@@ -48,6 +49,10 @@ namespace MyParkingApp.Controllers
         }
 
         [HttpGet("{id}")]
+        [SwaggerOperation(Summary = "Method that returns a client according to an id.")]
+        [SwaggerResponse(200, "Get the customer", typeof(List<Client>))]
+        [SwaggerResponse(404, "No customer found")]
+        [SwaggerResponse(500, "Internal api error")]
         public async Task<ActionResult<Client>> GetClient(int id)
         {
             var client = await _client.GetClient(id);
@@ -63,6 +68,9 @@ namespace MyParkingApp.Controllers
         }
 
         [HttpPost("CreateClient")]
+        [SwaggerOperation(Summary = "Method that creates a client.")]
+        [SwaggerResponse(200, "The client is created", typeof(List<Client>))]
+        [SwaggerResponse(500, "Internal api error")]
         public async Task<ActionResult<Client>>CreateClient(
             [FromBody, SwaggerRequestBody("Customer data to create", Required =true)]ClientDto clientDto)
         {
@@ -81,7 +89,12 @@ namespace MyParkingApp.Controllers
             }
         }
         [HttpPut("UpdateClient")]
-        public async Task<IActionResult> UpdateDriver(ClientDto clientDto)
+        [SwaggerOperation(Summary = "Method that updates a client.")]
+        [SwaggerResponse(200, "The client is updated", typeof(bool))]
+        [SwaggerResponse(404, "No customer found")]
+        [SwaggerResponse(500, "Internal api error")]
+        public async Task<IActionResult> UpdateDriver(
+            [FromBody, SwaggerRequestBody("Customer data to update", Required = true)] ClientDto clientDto)
         {
             try
             {
@@ -98,6 +111,10 @@ namespace MyParkingApp.Controllers
             }
         }
         [HttpDelete("{id}")]
+        [SwaggerOperation(Summary = "Method that delete a client.")]
+        [SwaggerResponse(200, "The customer is deleted", typeof(bool))]
+        [SwaggerResponse(404, "No customer found")]
+        [SwaggerResponse(500, "Internal api error")]
         public async Task<IActionResult> DeleteClient(int id)
         {
             try

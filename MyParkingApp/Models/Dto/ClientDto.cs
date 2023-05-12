@@ -16,7 +16,7 @@ namespace MyParkingApp.Models.Dto
 
         public int PlaceId { get; set; }
 
-        public string? DepatureDateTime { get; set; }
+        public string DepatureDateTime { get; set; }
 
         public bool Discount { get; set; }
 

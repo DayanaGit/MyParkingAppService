@@ -4,6 +4,7 @@ using Dapper;
 using MyParkingApp.Models.Dto;
 using AutoMapper;
 using MySql.Data.MySqlClient;
+using System.Collections.Generic;
 
 namespace MyParkingApp.Repository
 {
@@ -30,9 +31,22 @@ namespace MyParkingApp.Repository
             {
                 clientDto.AdmissionDateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
+                var ing = DateTime.Parse(clientDto.AdmissionDateTime);
+                var outs = DateTime.Parse(clientDto.DepatureDateTime);
+                TimeSpan hours = ing.Subtract(outs);
+                if (clientDto.VehicleTypeId == 1)
+                {
+                    clientDto.TotalPay = (62 * Convert.ToInt32(hours.Minutes)).ToString();
+                }
+                else
+                {
+                    clientDto.TotalPay = (120 * Convert.ToInt32(hours.Hours)).ToString();
+                }
                 if (clientDto.Discount == true)
                 {
+                    var total = Convert.ToDouble(clientDto.TotalPay);
                     discountNumber = 0.25;
+                    clientDto.TotalPay = (total - (total * discountNumber)).ToString();
                 }
                 var sql = @"INSERT INTO Clients (
                         Plate,
@@ -42,7 +56,8 @@ namespace MyParkingApp.Repository
                         Discount,
                         VehicleTypeId,
                         ElectricHybrid,
-                        State
+                        State,
+                        TotalPay
                         )VALUES(
                         @Plate,
                         @AdmissionDateTime,
@@ -51,7 +66,8 @@ namespace MyParkingApp.Repository
                         @discountNumber,
                         @VehicleTypeId,
                         @ElectricHybrid,
-                        @State
+                        @State,
+                        @TotalPay
                         )";
                 var res = await db.ExecuteAsync(sql, new
                 {
@@ -62,7 +78,8 @@ namespace MyParkingApp.Repository
                     discountNumber,
                     clientDto.VehicleTypeId,
                     clientDto.ElectricHybrid,
-                    clientDto.State
+                    clientDto.State,
+                    clientDto.TotalPay
                 });
                 var sqlUpdate = @"UPDATE Places SET Available=0 WHERE Id=@Id";
                 var resUpdate = await db.ExecuteAsync(sqlUpdate, new { Id = clientDto.PlaceId });
@@ -80,19 +97,30 @@ namespace MyParkingApp.Repository
 
         public async Task<bool> DeleteClient(int id)
         {
-            var db = dbConnection();
-            db.Open();
-            var sql = @"DELETE FROM Clients WHERE Id = @id";
-            var res = await db.ExecuteAsync(sql, new { Id = id });
-            db.Close();
-            return res > 0;
+            try
+            {
+                var db = dbConnection();
+                db.Open();
+                var sql = @"DELETE FROM Clients WHERE Id = @id";
+                var res = await db.ExecuteAsync(sql, new { Id = id });
+                db.Close();
+                return res > 0;
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+            
         }
 
         public async Task<Client> GetClient(int id)
         {
-            var db = dbConnection();
-            db.Open();
-            var sql = @"SELECT
+            var res = new Client();
+            try
+            {
+                var db = dbConnection();
+                db.Open();
+                var sql = @"SELECT
                         Id,
                         Plate,
                         AdmissionDateTime,
@@ -104,43 +132,72 @@ namespace MyParkingApp.Repository
                         TotalPay,
                         State
                         FROM Clients WHERE Id = @Id";
-            Client res = await db.QueryFirstOrDefaultAsync<Client>(sql, new { Id = id });
-            db.Close();
-            return res;
+                 res = await db.QueryFirstOrDefaultAsync<Client>(sql, new { Id = id });
+                db.Close();
+                return res;
+            }
+            catch (Exception ex)
+            {
+                return res ;
+            }
+            
         }
 
         public async Task<IEnumerable<Client>> GetClients()
         {
-            var db = dbConnection();
-            db.Open();
-            var sql = @"SELECT
-                        Id,
-                        Plate,
-                        AdmissionDateTime,
-                        PlaceId,
-                        DepatureDateTime,
-                        Discount,
-                        VehicleTypeId,
-                        ElectricHybrid,
-                        TotalPay,
-                        State
-                        FROM Clients";
-            var res = await db.QueryAsync<Client>(sql);
-            db.Close();
-            return res;
+            IEnumerable<Client>? res;
+            try
+            {
+                var db = dbConnection();
+                db.Open();
+                var sql = @"SELECT
+                            Id,
+                            Plate,
+                            AdmissionDateTime,
+                            PlaceId,
+                            DepatureDateTime,
+                            Discount,
+                            VehicleTypeId,
+                            ElectricHybrid,
+                            TotalPay,
+                            State
+                            FROM Clients";
+                res = await db.QueryAsync<Client>(sql);
+                db.Close();
+                return res;
+            }
+            catch (Exception ex)
+            {
+                return res = null;
+            }
         }
 
         public async Task<bool> UpdateClient(ClientDto clientDto)
         {
+            try
+            {
             var db = dbConnection();
             Client clientExist = await GetClient(clientDto.Id);
             var discountNumber = 0.0;
 
-            if (clientDto.Discount == true)
-            {
-                discountNumber = 0.25;
-            }
-            db.Open();
+                var ing = DateTime.Parse(clientDto.AdmissionDateTime);
+                var outs = DateTime.Parse(clientDto.DepatureDateTime);
+                TimeSpan hours = outs.Subtract(ing);
+                if (clientDto.VehicleTypeId == 1)
+                {
+                    clientDto.TotalPay = (62 * Convert.ToInt32(hours.Hours)).ToString();
+                }
+                else
+                {
+                    clientDto.TotalPay = (120 * Convert.ToInt32(hours.Hours)).ToString();
+                }
+                if (clientDto.Discount == true)
+                {
+                    var total = Convert.ToDouble(clientDto.TotalPay);
+                    discountNumber = 0.25;
+                    clientDto.TotalPay = (total - (total * discountNumber)).ToString();
+                }
+                db.Open();
 
             var sql = @"UPDATE Clients SET
                         Plate = @Plate,
@@ -163,17 +220,23 @@ namespace MyParkingApp.Repository
                 clientDto.VehicleTypeId,
                 clientDto.ElectricHybrid,
                 clientDto.TotalPay,
-                clientDto.State
+                clientDto.State,
+                Id = clientDto.Id
             });
             if (clientDto.PlaceId != clientExist.PlaceId)
             {
-                var sqlUpdateNew = @"UPDATE Places SET Available=0 WHERE Id=@placeIdNew";
+                var sqlUpdateNew = @"UPDATE Places SET Available=0 WHERE Id=@Id";
                 var resUpdateNew = await db.ExecuteAsync(sqlUpdateNew, new { Id = clientDto.PlaceId });
-                var sqlUpdateOld = @"UPDATE Places SET Available=1 WHERE Id=@placeIdOld";
+                var sqlUpdateOld = @"UPDATE Places SET Available=1 WHERE Id=@Id";
                 var resUpdateOld = await db.ExecuteAsync(sqlUpdateOld, new { Id = clientExist.PlaceId });
             }
             db.Close();
             return res > 0;
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
         }
     }
 }
